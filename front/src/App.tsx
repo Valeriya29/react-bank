@@ -2,7 +2,7 @@ import React, { createContext, useReducer, useContext } from "react";
 
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Link, Navigate } from "react-router-dom";
-import { WellcomePage } from "./page/WellcomePage";
+import { WelcomePage } from "./page/WelcomePage";
 import { SignupPage } from "./page/SignupPage";
 import { SignupConfirmPage } from "./page/SignupConfirmPage";
 import { SigninPage } from "./page/SigninPage";
@@ -98,7 +98,7 @@ function App() {
             path="/"
             element={
               <AuthRoute>
-                <WellcomePage />
+                <WelcomePage />
               </AuthRoute>
             }
           />
