@@ -1,101 +1,43 @@
-import React, { createContext, useReducer, useContext } from "react";
-
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { Link, Navigate } from "react-router-dom";
-import { WelcomePage } from "./page/WelcomePage";
-import { SignupPage } from "./page/SignupPage";
-import { SignupConfirmPage } from "./page/SignupConfirmPage";
-import { SigninPage } from "./page/SigninPage";
-import { RecoveryPage } from "./page/RecoveryPage";
-import { RecoveryConfirmPage } from "./page/RecoveryConfirmPage";
-import { BalancePage } from "./page/BalancePage";
-import { SettingsPage } from "./page/SettingsPage";
-import { NotificationsPage } from "./page/NotificationsPage";
-import { RecivePage } from "./page/RecivePage";
-import { SendPage } from "./page/SendPage";
+import React, { useReducer } from "react";
+import "./App.css";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import WelcomePage from "./page/WelcomePage";
+import SignupPage from "./page/SignupPage";
+import AuthRoute from "./container/AuthRoute";
+import PrivateRoute from "./container/PrivateRoute";
+import SigninPage from "./page/SigninPage";
+import SignupConfirmPage from "./page/SignupConfirmPage";
+import RecoveryPage from "./page/RecoveryPage";
+import RecoveryConfirmPage from "./page/RecoveryConfirmPage";
+import BalancePage from "./page/BalancePage";
+import SettingsPage from "./page/SettingsPage";
+import NotificationsPage from "./page/NotificationsPage";
 import TransactionPage from "./page/TransactionPage";
-
-import AuthRoute from "./component/auth-route/AuthRoute";
-import PrivateRoute from "./component/privat-router";
-import ErrorPage from "./page/ErrorPage";
-
-//Типи для даних аутентифікації
-export type ContextType = {
-  state: {
-    isAuthenticated: boolean;
-    token: string | null;
-    user: { email: string; isConfirm: boolean; id: number } | null;
-  };
-  dispatch: (action: AuthAction) => void;
-};
-
-export type AuthAction =
-  | {
-      type: "LOGIN";
-      payload: {
-        token: string;
-        user: { email: string; isConfirm: boolean; id: number };
-      };
-    }
-  | {
-      type: "AUTH";
-      payload: {
-        token: string;
-        user: { email: string; isConfirm: boolean; id: number };
-      };
-    }
-  | { type: "LOGOUT" };
-
-//Створення контекста для даних аутентифікації
-export const AuthContext = createContext<ContextType | null>(null);
-
-//Початковий стан.
-export const initialAuthState = {
-  isAuthenticated: false,
-  token: null,
-  user: { email: null, isConfirm: null, id: null },
-};
-
-// Редуктор для оброки дій
-export function authReducer(state: any, action: AuthAction) {
-  switch (action.type) {
-    case "LOGIN":
-      return {
-        ...state,
-        isAuthenticated: true,
-        token: action.payload.token,
-        user: action.payload.user,
-      };
-    case "AUTH":
-      return {
-        ...state,
-        isAuthenticated: false,
-        token: action.payload.token,
-        user: action.payload.user,
-      };
-
-    case "LOGOUT":
-      return {
-        ...state,
-        isAuthenticated: false,
-        token: null,
-        user: null,
-      };
-
-    default:
-      return state;
-  }
-}
+import SendPage from "./page/SendPage";
+import RecivePage from "./page/RecivePage";
+import Error from "./page/ErrorPage";
+import {
+  AuthContext,
+  authReducer,
+  AuthState,
+  initialAuthState,
+} from "./container/AuthContext";
 
 function App() {
-  const [state, dispatch] = useReducer(authReducer, initialAuthState);
+  const storedState = localStorage.getItem("authState");
+  const initialState: AuthState = storedState
+    ? JSON.parse(storedState)
+    : initialAuthState;
+
+  const [state, dispatch] = useReducer(authReducer, initialState);
+  console.log("App: state, dispatch : ", state, dispatch);
 
   return (
     <AuthContext.Provider value={{ state, dispatch }}>
       <BrowserRouter>
         <Routes>
           <Route
-            path="/"
+            index
             element={
               <AuthRoute>
                 <WelcomePage />
@@ -113,9 +55,9 @@ function App() {
           <Route
             path="/signup-confirm"
             element={
-              <AuthRoute>
+              <PrivateRoute>
                 <SignupConfirmPage />
-              </AuthRoute>
+              </PrivateRoute>
             }
           />
           <Route
@@ -151,18 +93,18 @@ function App() {
             }
           />
           <Route
-            path="/settings"
-            element={
-              <PrivateRoute>
-                <SettingsPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
             path="/notifications"
             element={
               <PrivateRoute>
                 <NotificationsPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <PrivateRoute>
+                <SettingsPage />
               </PrivateRoute>
             }
           />
@@ -174,7 +116,6 @@ function App() {
               </PrivateRoute>
             }
           />
-
           <Route
             path="/send"
             element={
@@ -183,7 +124,6 @@ function App() {
               </PrivateRoute>
             }
           />
-
           <Route
             path="/transaction/:transactionId"
             element={
@@ -192,8 +132,7 @@ function App() {
               </PrivateRoute>
             }
           />
-
-          <Route path="*" element={<ErrorPage />} />
+          <Route path="*" Component={Error} />
         </Routes>
       </BrowserRouter>
     </AuthContext.Provider>

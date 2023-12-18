@@ -1,165 +1,111 @@
-import "../style/authpage.scss";
-import "../style/indikator.scss";
-import Indikator from "../container/wellcomepage/img/indikator.svg";
-import { useContext, useReducer, useState } from "react";
-import { AuthContext, initialAuthState } from "../App";
-import React from "react";
-import {
-  NAME_FIELD,
-  ERR_FIELD,
-  REG_EXP_EMAIL,
-  REG_EXP_PASSWORD,
-} from "../data/const";
-import { useNavigate } from "react-router-dom";
-import { ACTION_TYPE, initialState, reducer } from "../util/reducer";
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import StatusBar from "../component/status-bar/index";
+import ArrowBack from "../component/arrow-back/index";
+import Alert from "../component/alert/index";
+import Page from "../component/page/index";
+import Title from "../component/title/index";
+import Input from "../component/input/index";
+import { useAuth } from "../container/AuthContext";
 
-import StatusBar from "../component/statusbar";
-import Title from "../component/title";
-import BackButton from "../component/back-button";
-import Page from "../component/page";
-import Input from "../component/input";
-import Button from "../component/button";
-import Alert from "../component/alert";
-import Danger from "../component/form-field/svg/danger.svg";
-import Grid from "../component/grid";
+// На цій сторінці вводимо код підтвердження реєстрації акаунта
+//та після успішного запиту переводимо на сторінку /balance
+//Перевіряємо в контексті аутентифікації чи user.confirm. Якщо
+//так, то переводимо на сторінку /balance
 
-const { CODE } = NAME_FIELD;
+const SignupConfirmPage: React.FC = () => {
+  const [code, setCode] = useState<string>("");
+  const [alert, setAlert] = useState<string>("");
+  const { state, dispatch } = useAuth();
+  //const { state, dispatch } = useContext(AuthContext);
 
-export const SignupConfirmPage: React.FC = () => {
-  const auth = useContext(AuthContext);
+  //const [state, dispatch] = useReducer(authReducer, initialAuthState);
 
   const navigate = useNavigate();
 
-  //====== Достаємо значення і поля вводу=====
-  // ===== через useState =====
-  // const [inputValue, setInputValue] = useState("");
-  // const handleInputChange = (value: string) => {
-  //   setInputValue(value);
-  // };
-  // const code = inputValue;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    //const newCode: number = parseInt((e.target as HTMLInputElement).value, 10);
+    const newCode = (e.target as HTMLInputElement).value;
+    setCode(newCode);
+    //const code: Number = code;
+    //const code = (e.target as HTMLInputElement).value;
+    //const code = e.target.value;
+    const email = state.email;
+    console.log("code: ", code, "email:", email);
 
-  // ===== через useReducer =====
-  const [state, dispatch] = useReducer(reducer, initialState);
-  const handleInputChange = (name: string, value: string) => {
-    // console.log(name, value.length);
-    dispatch({
-      type: ACTION_TYPE.SET_FORM_VAL,
-      payload: {
-        ...state.formValues,
-        [name]: value,
-      },
-    });
-  };
+    if (!code) {
+      setAlert("Enter the code you are recived");
+    } else {
+      const enteredCode: Number = Number(code);
+      console.log(enteredCode);
+      try {
+        const response = await fetch("http://localhost:4000/signup-confirm", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email, enteredCode }),
+        });
 
-  //=====Перевірки того зщо вводять в поле====
-  const validate = () => {
-    const { code } = state.formValues;
-    const err = { [CODE]: "" };
-
-    if (code.length < 1) {
-      err[CODE] = ERR_FIELD.IS_EMPTY;
-    } else if (code.length > 6) {
-      err[CODE] = ERR_FIELD.IS_BIG;
-    }
-
-    dispatch({ type: ACTION_TYPE.SEN_FORM_ERR, payload: err });
-
-    return Object.values(err).every((err) => !err);
-  };
-
-  //відправка на сервер
-  const handleSubmit = () => {
-    const checkValidate = validate();
-
-    if (checkValidate) sendCode();
-  };
-
-  const sendCode = async () => {
-    try {
-      const res = await fetch(`http://localhost:4000/signup-confirm`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: convertData(),
-      });
-      //Получаю данные из router '/signup-confirm'
-      //code i token
-      const data = await res.json();
-
-      // console.log("data========>>>", data);
-      //Делаю серверную часть и потом возвращаюсь сюда
-      // console.log("res.ok ====>>>>", res.ok);
-
-      if (res.ok) {
-        if (auth) {
-          auth.dispatch({
-            type: "LOGIN",
-            payload: {
-              token: data.session.token,
-              user: data.session.user,
-            },
-          });
-          // console.log("next BalancePage -->");
+        if (response.status === 409) {
+          // 'Invalid code'
+          const responseData = await response.json();
+          console.error(responseData.error);
+          setCode("");
+          setAlert(responseData.error);
         }
 
-        navigate("/balance");
+        if (response.ok) {
+          // Code confirmed
+          const responseData = await response.json(); // Parse the JSON response
+          console.log("Response OK responseData:", responseData);
+          const user = responseData.user;
+
+          // Dispatch the "LOGIN" action to update the state
+          dispatch({ type: "LOGIN", payload: user });
+          navigate("/balance");
+        } else {
+          // Handle registration errors
+          console.error("Cod confirmation failed");
+        }
+      } catch (error) {
+        console.error("An error occurred:", error);
       }
-
-      dispatch({
-        type: ACTION_TYPE.SET_ALERT,
-        payload: data.message,
-      });
-    } catch (e: any) {
-      dispatch({
-        type: ACTION_TYPE.SET_ALERT,
-        payload: e.toString(),
-      });
     }
-  };
-
-  const convertData = () => {
-    return JSON.stringify({
-      [CODE]: state.formValues[CODE],
-      token: auth?.state.token,
-    });
   };
 
   return (
-    <Page className="authpage">
-      <div className="box">
-        <StatusBar />
-        <BackButton />
+    <Page>
+      <StatusBar color="black" />
+      <ArrowBack />
+      <Title
+        title="Confirm account"
+        description="Write the code you received"
+      />
+      <div className="inputs">
+        <form className="form" onSubmit={handleSubmit}>
+          <Input
+            label="Code"
+            labelClassName={alert ? "input--error" : "input"}
+            borderClassName={alert ? "input__field--error" : "input__field"}
+            name={"code"}
+            type="text"
+            value={code}
+            onChange={(e) => {
+              setCode(e.target.value);
+              setAlert("");
+            }}
+            notice={alert ? "Invalid code" : ""}
+            autoFocus
+          />
+          <button className="button button-primary">Confirm</button>
+          {alert ? <Alert status="yellow" text={alert} /> : null}
+        </form>
       </div>
-      <Grid>
-        <Title
-          title="Confirm account"
-          desctiption="Write the code you received"
-        />
-        <Input
-          placeholder="Enter your code"
-          label="Code"
-          name={CODE}
-          onInputChange={(value) => handleInputChange(CODE, value)}
-          error={state.formErrors[CODE]}
-        />
-        <Button onClick={handleSubmit} className="button button--primary">
-          Confirm
-        </Button>
-
-        <Alert text={state.alert} />
-      </Grid>
-      <img src={Indikator} alt="ind" className="indikator" />
+      <Link to="/signup"></Link>
     </Page>
   );
 };
 
-////=====
-{
-  /* <Alert className="alert alert--error">
-          <span>
-            <img src={Danger} alt="error" />
-          </span>
-          A user with the same name is already exist
-        </Alert> */
-}
+export default SignupConfirmPage;

@@ -1,18 +1,24 @@
 import React from "react";
-import Page from "../component/page";
-import Grid from "../component/grid";
-import Title from "../component/title";
-import BackButton from "../component/back-button";
+import { Link } from "react-router-dom";
+import StatusBar from "../component/status-bar/index";
+import Page from "../component/page/index";
+import ArrowBackTitle from "../component/arrow-back-title";
 
-const ErrorPage: React.FC = () => {
+const Error: React.FC = () => {
   return (
-    <Page className="">
-      <Grid>
-        <BackButton />
-        <Title title="Page not found" desctiption=""></Title>
-      </Grid>
+    <Page>
+      <StatusBar color="black" />
+      <ArrowBackTitle title="Error" />
+
+      <div className="notice">
+        <br />
+        Something went wrong or this page isn't exist. <br /> <br />
+        <Link className="notice__link" to="/">
+          Start Again
+        </Link>
+      </div>
     </Page>
   );
 };
 
-export default ErrorPage;
+export default Error;

@@ -1,63 +1,79 @@
-import "../style/authpage.scss";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import StatusBar from "../component/status-bar/index";
+import ArrowBack from "../component/arrow-back/index";
+import Alert from "../component/alert/index";
+import Page from "../component/page/index";
 
-import React from "react";
-import { useContext, useState, useCallback, useEffect } from "react";
-import { AuthContext } from "../App";
-import NotificationsList from "../container/notifications-list";
-import { Notifications } from "../data/type";
+import { useAuth } from "../container/AuthContext";
+import ArrowBackTitle from "../component/arrow-back-title";
+import NotificationItem from "../component/notification";
 
-import StatusBar from "../component/statusbar";
-import BackButtonTitle from "../component/back-button-title";
-import Page from "../component/page";
+// Сторінка списку нотифікацій, який створюються при діях: Вхід
+//в акаунт Відновлення акаунту Зміна пароля Зміна пошти
+// Поповнення Переказ
 
-import { NAME_FIELD } from "../data/const";
+type Notification = {
+  message: string;
+  type: string;
+  time: string;
+};
 
-export const NotificationsPage: React.FC = () => {
-  const [notifications, setNotifications] = useState<Notifications[]>([]);
+const NotificationsPage: React.FC = () => {
+  document.body.classList.add("body-background");
 
-  const auth = useContext(AuthContext);
+  const { state } = useAuth();
+  const userEmail = state.email;
+  console.log(userEmail);
 
-  const userAuthId = auth?.state?.user?.id;
-  // console.log(userId);
+  const [notifications, setNotifications] = useState<Notification[]>([]); // All the time tefreshing back-end
+  console.log("notifications 3:", notifications);
 
-  const getNotifications = useCallback(async () => {
+  useEffect(() => {
+    // Back-end log is running witout useEffect
+    const url = `http://localhost:4000/notifications?email=${userEmail}`;
     try {
-      const res = await fetch(`http://localhost:4000/notifications`, {
-        method: "POST",
+      fetch(url, {
+        method: "GET",
         headers: {
           "Content-Type": "application/json",
         },
-        body: convertData(),
-      });
+      })
+        .then((response) => {
+          if (response.ok) {
+            return response.json(); // Parse the JSON response
+          } else {
+            throw new Error("Network response was not ok");
+          }
+        })
+        .then((data) => {
+          console.log("Data fetched:", data);
 
-      const data = await res.json();
-
-      if (res.ok) {
-        // console.log("datanot--->", data.session.notifications);
-
-        if (data.session.notifications !== null)
-          setNotifications(data.session.notifications);
-      }
-    } catch (error: any) {}
-  }, [auth]);
-
-  const convertData = () => {
-    return JSON.stringify({
-      [NAME_FIELD.USER_ID]: userAuthId,
-    });
-  };
-
-  useEffect(() => {
-    getNotifications();
-  }, [getNotifications]);
+          console.log(data.user.notifications);
+          setNotifications(data.user.notifications); // All the time tefreshing back-end
+        });
+    } catch (error) {
+      console.error("An error occurred:", error);
+    }
+  }, [userEmail]);
 
   return (
-    <Page className="light-gray">
-      <div>
-        <StatusBar />
-        <BackButtonTitle title="Notifications" />
-      </div>
-      <NotificationsList notifications={notifications} />
-    </Page>
+    <body style={{ backgroundColor: "var(--Grey-BG, #F5F5F7)" }}>
+      <Page>
+        <StatusBar color="black" />
+        <ArrowBackTitle title="Notifications" />
+        <div className="notifications">
+          <ul>
+            {notifications.reverse().map((notification, index) => (
+              <li key={index}>
+                <NotificationItem notification={notification} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      </Page>
+    </body>
   );
 };
+
+export default NotificationsPage;

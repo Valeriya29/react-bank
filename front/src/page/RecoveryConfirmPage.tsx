@@ -1,151 +1,141 @@
-import "../style/authpage.scss";
-import "../style/indikator.scss";
+import React, { useState, ChangeEvent } from "react";
+import { Link, Navigate, useNavigate, useLocation } from "react-router-dom";
+import StatusBar from "../component/status-bar/index";
+import ArrowBack from "../component/arrow-back/index";
+import Alert from "../component/alert/index";
+import Page from "../component/page/index";
+import Title from "../component/title/index";
+import Input from "../component/input/index";
+import InputPassword from "../component/input-password/index";
+import { useAuth } from "../container/AuthContext";
 
-import React from "react";
-import { useContext, useReducer } from "react";
-import { useNavigate } from "react-router-dom";
-import { AuthContext } from "../App";
+//Сторінка підтвердження відновлення та оновлення пароля. Після
+//відправки форми потрібно перевести на сторінку /balance
 
-import Indikator from "../container/wellcomepage/img/indikator.svg";
-import StatusBar from "../component/statusbar";
-import Title from "../component/title";
-import BackButton from "../component/back-button";
-import Page from "../component/page";
-import Input from "../component/input";
-import Button from "../component/button";
-import Alert from "../component/alert";
-import Grid from "../component/grid";
-import { NAME_FIELD, ERR_FIELD, REG_EXP_PASSWORD } from "../data/const";
-import { ACTION_TYPE, initialState, reducer } from "../util/reducer";
+const RecoveryConfirmPage: React.FC = () => {
+  const [password, setPassword] = useState<string>("");
+  const [code, setCode] = useState<string>("");
+  const [isPasswordValid, setPasswordIsValid] = useState(true);
+  const [alert, setAlert] = useState<string>("");
+  const { state, dispatch } = useAuth();
 
-const { CODE, PASSWORD } = NAME_FIELD;
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const email = searchParams.get("email");
+  console.log("email", email);
 
-export const RecoveryConfirmPage: React.FC = () => {
-  const auth = useContext(AuthContext);
+  const validatePassword = (password: string) => {
+    // Define your password validation criteria here
+    const minLength = 8;
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasSpecialChar = /[!@#$%^&*]/.test(password);
+    return password.length >= minLength && hasUppercase && hasSpecialChar;
+  };
+
+  const handlePasswordChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    const newPassword: string = e.target.value;
+    setPassword(newPassword);
+    setPasswordIsValid(validatePassword(newPassword));
+  };
 
   const navigate = useNavigate();
 
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordIsValid(validatePassword(password));
+    if (!code && !password) {
+      setAlert("Enter code and password!");
+    } else if (!code) {
+      setAlert("Enter code you recived!");
+    } else if (!password) {
+      setAlert("Create a password!");
+    } else if (!isPasswordValid) {
+      setAlert("Minimum 8 symbols, 1 UpperCase, 1 special");
+    } else {
+      const enteredCode: Number = Number(code);
+      console.log(email, password, enteredCode);
+      try {
+        const response = await fetch("http://localhost:4000/recovery-confirm", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email, password, enteredCode }),
+        });
 
-  //=========
-
-  const handleInputChange = (name: string, value: string) => {
-    dispatch({
-      type: ACTION_TYPE.SET_FORM_VAL,
-      payload: {
-        ...state.formValues,
-        [name]: value,
-      },
-    });
-  };
-
-  const validate = () => {
-    const { code, password } = state.formValues;
-
-    console.log("recoveryConfirm--> code:", code, "pass:", password);
-
-    const err = { [CODE]: "", [PASSWORD]: "" };
-
-    if (code.length < 1) {
-      err[CODE] = ERR_FIELD.IS_EMPTY;
-    } else if (code.length > 6) {
-      err[CODE] = ERR_FIELD.IS_BIG;
-    }
-
-    if (password.length < 1) {
-      err[PASSWORD] = ERR_FIELD.IS_EMPTY;
-    } else if (!REG_EXP_PASSWORD.test(password)) {
-      err[PASSWORD] = ERR_FIELD.PASSWORD;
-    }
-
-    dispatch({ type: ACTION_TYPE.SEN_FORM_ERR, payload: err });
-
-    return Object.values(err).every((err) => !err);
-  };
-
-  const handleSubmit = () => {
-    const checkValidate = validate();
-    if (checkValidate) sendRecovery();
-  };
-
-  const convertData = () => {
-    return JSON.stringify({
-      [CODE]: state.formValues[CODE],
-      [PASSWORD]: state.formValues[PASSWORD],
-    });
-  };
-
-  const sendRecovery = async () => {
-    try {
-      const res = await fetch(`http://localhost:4000/recovery-confirm`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: convertData(),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        if (auth) {
-          auth.dispatch({
-            type: "LOGIN",
-            payload: {
-              token: data.session.token,
-              user: data.session.user,
-            },
-          });
+        if (response.status === 409) {
+          // Handle the case where the email already exists
+          const responseData = await response.json();
+          console.log(responseData.error);
+          console.error(responseData.error);
+          setAlert(responseData.error);
         }
-        navigate("/balance");
-      }
 
-      dispatch({
-        type: ACTION_TYPE.SET_ALERT,
-        payload: data.message,
-      });
-    } catch (error: any) {
-      dispatch({
-        type: ACTION_TYPE.SET_ALERT,
-        payload: error.toString(),
-      });
+        if (response.ok) {
+          // Registration successful, you can navigate to the next page
+          const responseData = await response.json(); // Parse the JSON response
+          console.log("Response Data:", responseData);
+
+          const user = responseData.user;
+          console.log("user:", user);
+
+          dispatch({ type: "LOGIN", payload: user });
+
+          navigate("/signup-confirm");
+        } else {
+          // Handle registration errors
+          console.error("Registration failed");
+        }
+      } catch (error) {
+        console.error("An error occurred:", error);
+      }
     }
   };
 
   return (
-    <Page className="authpage">
-      <div className="box">
-        <StatusBar />
-        <BackButton />
+    <Page>
+      <StatusBar color="black" />
+      <ArrowBack />
+      <Title
+        title="Recover password"
+        description="Write the code you received"
+      />
+      <div className="inputs">
+        <form className="form" onSubmit={handleSubmit}>
+          <Input
+            label="Code"
+            labelClassName={alert ? "input--error" : "input"}
+            borderClassName={alert ? "input__field--error" : "input__field"}
+            name={"code"}
+            type="text"
+            value={code}
+            onChange={(e) => {
+              setCode(e.target.value);
+              setAlert("");
+            }}
+            notice={alert ? "Invalid code" : ""}
+            autoFocus
+          />
+          <InputPassword
+            label="Password"
+            labelClassName={isPasswordValid ? "input" : "input--error"}
+            borderClassName={
+              isPasswordValid ? "input__field" : "input__field--error"
+            }
+            name={"password"}
+            type="password"
+            value={password}
+            onChange={handlePasswordChange}
+            notice={isPasswordValid ? "" : "Sorry, the password is too simple"}
+          />
+          <button className="button button-primary" type="submit">
+            Restore&nbsp;password
+          </button>
+          {alert ? <Alert status="yellow" text={alert} /> : null}
+        </form>
       </div>
-      <Grid>
-        <Title
-          title="Recover password"
-          desctiption="Choose a recovery method"
-        />
-        <Input
-          placeholder="Введіть code"
-          label="Code"
-          name={CODE}
-          onInputChange={(value) => handleInputChange(CODE, value)}
-          error={state.formErrors[CODE]}
-        />
-
-        <Input
-          placeholder="Введіть новий пароль"
-          label="New Password"
-          name={PASSWORD}
-          onInputChange={(value) => handleInputChange(PASSWORD, value)}
-          password
-          error={state.formErrors[PASSWORD]}
-        />
-        <Button onClick={handleSubmit} className="button button--primary">
-          Restore password
-        </Button>
-
-        <Alert text={state.alert} />
-      </Grid>
-      <img src={Indikator} alt="ind" className="indikator" />
     </Page>
   );
 };
+
+export default RecoveryConfirmPage;

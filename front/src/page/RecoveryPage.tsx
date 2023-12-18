@@ -1,132 +1,105 @@
-import "../style/authpage.scss";
-import "../style/indikator.scss";
-import Indikator from "../container/wellcomepage/img/indikator.svg";
-import { useContext, useReducer } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useContext, useReducer, ChangeEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import StatusBar from "../component/status-bar/index";
+import ArrowBack from "../component/arrow-back/index";
+import Alert from "../component/alert/index";
+import Page from "../component/page/index";
+import Title from "../component/title/index";
+import Input from "../component/input/index";
+import { useAuth } from "../container/AuthContext";
+import { validateEmail } from "../component/Utils";
 
-import { AuthContext } from "../App";
-import React from "react";
-import StatusBar from "../component/statusbar";
-import Title from "../component/title";
-import BackButton from "../component/back-button";
-import Page from "../component/page";
-import Input from "../component/input";
-import Button from "../component/button";
-import Alert from "../component/alert";
-import Danger from "../component/form-field/svg/danger.svg";
-import Grid from "../component/grid";
-import { NAME_FIELD, ERR_FIELD, REG_EXP_EMAIL } from "../data/const";
-import { ACTION_TYPE, initialState, reducer } from "../util/reducer";
+//Сторінка відновлення акаунту. Після вводу пошти, створюється
+//код з підтвердженням відновлення акаунту, переводимо на
+//сторінку /recovery-confirm
 
-const { EMAIL } = NAME_FIELD;
+const RecoveryPage: React.FC = () => {
+  const [email, setEmail] = useState<string>("");
+  const [isEmailValid, setEmailIsValid] = useState(true);
+  const [alert, setAlert] = useState<string>("");
+  const { state, dispatch } = useAuth();
+  //const { state, dispatch } = useContext(AuthContext);
 
-export const RecoveryPage: React.FC = () => {
+  //const [state, dispatch] = useReducer(authReducer, initialAuthState);
+
+  const handleEmailChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    const newEmail: string = e.target.value;
+    setEmail(newEmail);
+    setEmailIsValid(validateEmail(newEmail));
+  };
+
   const navigate = useNavigate();
 
-  //====== Достаємо значення і поля вводу=====
-  // ===== через useReducer =====
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log("email:", email);
+    if (!email) {
+      setAlert("Please, enter your email");
+    } else {
+      setEmailIsValid(validateEmail(email));
+      if (isEmailValid) {
+        console.log("email is valid");
+        try {
+          const response = await fetch("http://localhost:4000/recovery", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ email }),
+          });
 
-  const handleInputChange = (name: string, value: string) => {
-    // console.log(name, value.length);
-    dispatch({
-      type: ACTION_TYPE.SET_FORM_VAL,
-      payload: {
-        ...state.formValues,
-        [name]: value,
-      },
-    });
-  };
+          if (response.status === 409) {
+            // 'User not find'
+            const responseData = await response.json();
+            console.error(responseData.error);
 
-  //=====Перевірки того що вводять в поле====
-  const validate = () => {
-    const { email } = state.formValues;
-    const err = { [EMAIL]: "" };
+            setAlert(responseData.error);
+          }
 
-    if (email.length < 1) {
-      err[EMAIL] = ERR_FIELD.IS_EMPTY;
-    } else if (email.length > 40) {
-      err[EMAIL] = ERR_FIELD.IS_BIG;
-    } else if (!REG_EXP_EMAIL.test(email)) {
-      err[EMAIL] = ERR_FIELD.EMAIL;
-    }
+          if (response.ok) {
+            // Code confirmed
+            const responseData = await response.json(); // Parse the JSON response
+            console.log("Response OK responseData:", responseData);
 
-    dispatch({ type: ACTION_TYPE.SEN_FORM_ERR, payload: err });
-
-    return Object.values(err).every((err) => !err);
-  };
-
-  //відправка на сервер
-  const handleSubmit = () => {
-    const checkValidate = validate();
-
-    if (checkValidate) submit();
-  };
-
-  const submit = async () => {
-    try {
-      const res = await fetch(`http://localhost:4000/recovery`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: convertData(),
-      });
-      //Получаю данные из router '/recovery'
-      //email
-      const data = await res.json();
-
-      console.log("data========>>>", data);
-      //Делаю серверную часть и потом возвращаюсь сюда
-      // console.log("res.ok ====>>>>", res.ok);
-
-      if (res.ok) {
-        console.log("next recovery-confirm");
-        navigate("/recovery-confirm");
+            navigate(`/recovery-confirm?email=${email}`);
+          } else {
+            // Handle registration errors
+            console.error("Recovery failed");
+          }
+        } catch (error) {
+          console.error("An error occurred:", error);
+        }
       }
-
-      dispatch({
-        type: ACTION_TYPE.SET_ALERT,
-        payload: data.message,
-      });
-    } catch (e: any) {
-      dispatch({
-        type: ACTION_TYPE.SET_ALERT,
-        payload: e.toString(),
-      });
     }
   };
 
-  const convertData = () => {
-    return JSON.stringify({
-      [EMAIL]: state.formValues[EMAIL],
-    });
-  };
   return (
-    <Page className="authpage">
-      <div className="box">
-        <StatusBar />
-        <BackButton />
+    <Page>
+      <StatusBar color="black" />
+      <ArrowBack />
+      <Title title="Recover password" description="Choose a recovery method" />
+      <div className="inputs">
+        <form className="form" onSubmit={handleSubmit}>
+          <Input
+            label="Email"
+            labelClassName={isEmailValid ? "input" : "input--error"}
+            borderClassName={
+              isEmailValid ? "input__field" : "input__field--error"
+            }
+            name={"email"}
+            type="text"
+            value={email}
+            onChange={handleEmailChange}
+            notice={isEmailValid ? "" : "Email is not valid"}
+            autoFocus
+          />
+          <button className="button button-primary">Send&nbsp;code</button>
+          {alert ? <Alert status="yellow" text={alert} /> : null}
+        </form>
       </div>
-      <Grid>
-        <Title
-          title="Recover password"
-          desctiption="Choose a recovery method"
-        />
-        <Input
-          placeholder="Введіть email"
-          label="Email"
-          name={EMAIL}
-          onInputChange={(value) => handleInputChange(EMAIL, value)}
-          error={state.formErrors[EMAIL]}
-        />
-        <Button onClick={handleSubmit} className="button button--primary">
-          Send code
-        </Button>
-
-        <Alert text={state.alert} />
-      </Grid>
-      <img src={Indikator} alt="ind" className="indikator" />
+      <Link to="/signup"></Link>
     </Page>
   );
 };
+
+export default RecoveryPage;

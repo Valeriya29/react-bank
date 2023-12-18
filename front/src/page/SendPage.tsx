@@ -1,162 +1,138 @@
-import "../style/authpage.scss";
-import { useContext, useReducer } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, ChangeEvent } from "react";
+import { Link, Navigate, useNavigate } from "react-router-dom";
+import StatusBar from "../component/status-bar/index";
+import ArrowBack from "../component/arrow-back/index";
+import Alert from "../component/alert/index";
+import Page from "../component/page/index";
+import Title from "../component/title/index";
+import Input from "../component/input/index";
+import InputPassword from "../component/input-password/index";
+import { useAuth } from "../container/AuthContext";
+import ArrowBackTitle from "../component/arrow-back-title";
+import { validateEmail, validateMoneyAmount } from "../component/Utils";
+import InputAmount from "../component/input-amount";
 
-import { AuthContext } from "../App";
-import React from "react";
-import StatusBar from "../component/statusbar";
-import Title from "../component/title";
-import BackButtonTitle from "../component/back-button-title";
-import Page from "../component/page";
-import Input from "../component/input";
-import Button from "../component/button";
-import Grid from "../component/grid";
-import Alert from "../component/alert";
+// {/* /Користувач вводить пошту та суму.
+//Після чого у користувача, який відправив суму,
+//створюється транзакція на списання грошей на нотифікацію,
+//а у користувача, який отримав гроші,
+//створюється транзакція на отримання грошей та нотифікацію */}
 
-import {
-  NAME_FIELD,
-  ERR_FIELD,
-  REG_EXP_EMAIL,
-  REG_EXP_MONEY,
-} from "../data/const";
-import { ACTION_TYPE, initialState, reducer } from "../util/reducer";
+const SendPage: React.FC = () => {
+  const [reciverEmail, setReceiverEmail] = useState<string>("");
+  const [amount, setAmount] = useState<string>("");
+  const [isEmailValid, setEmailIsValid] = useState(true);
+  const [isAmountValid, setAmountIsValid] = useState(true);
+  const [alert, setAlert] = useState<string>("");
+  const { state, dispatch } = useAuth();
 
-const { SUM, PAY_TO, EMAIL } = NAME_FIELD;
+  const senderEmail = state.email;
 
-export const SendPage: React.FC = () => {
-  const auth = useContext(AuthContext);
-
-  const emailUser = auth?.state.user?.email;
-
-  // console.log(auth);
-  //====== Достаємо значення і поля вводу=====
-  // ===== через useReducer =====
-  const [state, dispatch] = useReducer(reducer, initialState);
-
-  const handleInputChange = (name: string, value: string) => {
-    // console.log(value);
-    dispatch({
-      type: ACTION_TYPE.SET_FORM_VAL,
-      payload: {
-        ...state.formValues,
-        [name]: value,
-      },
-    });
+  const handleEmailChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    const newEmail: string = e.target.value;
+    setReceiverEmail(newEmail);
+    setEmailIsValid(validateEmail(newEmail));
   };
 
-  //=====Перевірки того що вводять в поле====
-  const validSendMoney = () => {
-    const { [PAY_TO]: emailTo, [SUM]: amount } = state.formValues;
-    // console.log(emailTo, amount);
-
-    const err = { [EMAIL]: "" };
-
-    if (emailTo.length < 1) {
-      err[EMAIL] = ERR_FIELD.IS_EMPTY;
-    } else if (emailTo.length > 40) {
-      err[EMAIL] = ERR_FIELD.IS_BIG;
-    } else if (!REG_EXP_EMAIL.test(emailTo)) {
-      err[EMAIL] = ERR_FIELD.EMAIL;
-    }
-
-    if (amount.length < 1) {
-      err[SUM] = ERR_FIELD.IS_EMPTY;
-    } else if (amount.length > 8) {
-      err[SUM] = ERR_FIELD.IS_BIG;
-    } else if (!REG_EXP_MONEY.test(amount)) {
-      err[SUM] = ERR_FIELD.MONEY;
-    }
-
-    dispatch({ type: ACTION_TYPE.SEN_FORM_ERR, payload: err });
-
-    return Object.values(err).every((err) => !err);
+  const handleMoneyAmountChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    const newAmount: string = e.target.value;
+    //const amountAsNumber: number = parseFloat(newAmount);
+    setAmount(newAmount);
+    setAmountIsValid(validateMoneyAmount(newAmount));
   };
 
-  //відправка на сервер
-  const handleSubmit = () => {
-    const checkValidate = validSendMoney();
+  const navigate = useNavigate();
 
-    if (checkValidate) sendMoney();
-  };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmailIsValid(validateEmail(reciverEmail));
 
-  const sendMoney = async () => {
-    try {
-      const res = await fetch(`http://localhost:4000/send`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: convertData(),
-      });
-      //Получаю данные из router '/recovery'
-      //email
-      const data = await res.json();
-
-      // console.log("data========>>>", data);
-      // console.log("res.ok ====>>>>", res.ok);
-
-      if (res.ok) {
-        dispatch({
-          type: ACTION_TYPE.SUCCESS,
-          payload: true,
+    if (!reciverEmail && !amount) {
+      setAlert("Enter email and amount!");
+    } else if (!reciverEmail) {
+      setAlert("Enter email!");
+    } else if (!amount) {
+      setAlert("Enter amount!");
+    } else if (!isEmailValid) {
+      setAlert("Enter e valid email!");
+    } else if (!isAmountValid) {
+      setAlert("Enter a valid amount");
+    } else if (senderEmail === reciverEmail) {
+      setAlert("No sence to send money to same account");
+    } else {
+      try {
+        const response = await fetch("http://localhost:4000/send", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ senderEmail, reciverEmail, amount }),
         });
 
-        return dispatch({
-          type: ACTION_TYPE.SET_ALERT,
-          payload: data.message,
-        });
+        if (response.status === 409) {
+          // Handle the case where the email already exists
+          const responseData = await response.json();
+          console.log(responseData.error);
+          console.error(responseData.error);
+          setAlert(responseData.error);
+        }
+
+        if (response.ok) {
+          const responseData = await response.json();
+          console.log("Response Data:", responseData);
+          setAlert(responseData.message);
+          navigate("/balance");
+        } else {
+          console.error("Transaction failed");
+        }
+      } catch (error) {
+        console.error("An error occurred:", error);
       }
-      dispatch({
-        type: ACTION_TYPE.SUCCESS,
-        payload: false,
-      });
-
-      dispatch({
-        type: ACTION_TYPE.SET_ALERT,
-        payload: data.message,
-      });
-    } catch (e: any) {
-      dispatch({
-        type: ACTION_TYPE.SET_ALERT,
-        payload: e.toString(),
-      });
     }
   };
 
-  const convertData = () => {
-    return JSON.stringify({
-      [SUM]: Number(state.formValues[SUM]),
-      [EMAIL]: emailUser,
-      [PAY_TO]: state.formValues[PAY_TO],
-    });
-  };
   return (
-    <Page className="light-gray">
-      <div className="box">
-        <StatusBar />
-        <BackButtonTitle title="Send" />
-      </div>
-      <Grid>
-        <Input
-          placeholder="Введіть email"
-          label="Email"
-          name={PAY_TO}
-          onInputChange={(value) => handleInputChange(PAY_TO, value)}
-          error={state.formErrors[PAY_TO]}
-        />
+    <body style={{ backgroundColor: "var(--Grey-BG, #F5F5F7)" }}>
+      <Page>
+        <StatusBar color="black" />
+        <ArrowBackTitle title="Send" />
 
-        <Input
-          placeholder="$"
-          label="Sum"
-          name={SUM}
-          onInputChange={(value) => handleInputChange(SUM, value)}
-          error={state.formErrors[SUM]}
-        />
-        <Button onClick={handleSubmit} className="button button--primary">
-          Send
-        </Button>
-        <Alert success={state.data} text={state.alert} />
-      </Grid>
-    </Page>
+        <div className="inputs">
+          <form className="form" onSubmit={handleSubmit}>
+            <Input
+              label="Email"
+              labelClassName={isEmailValid ? "input" : "input--error"}
+              borderClassName={
+                isEmailValid ? "input__field" : "input__field--error"
+              }
+              name={"email"}
+              type="text"
+              value={reciverEmail}
+              onChange={handleEmailChange}
+              notice={isEmailValid ? "" : "Amount is not valid"}
+            />
+            <InputAmount
+              label="Sum"
+              labelClassName={isAmountValid ? "input" : "input--error"}
+              borderClassName={
+                isAmountValid ? "input__field" : "input__field--error"
+              }
+              name={"amount"}
+              type="number"
+              value={amount}
+              onChange={handleMoneyAmountChange}
+              notice={isAmountValid ? "" : "Amount is not valid"}
+            />
+
+            <button className="button button-primary" type="submit">
+              Send
+            </button>
+            {alert ? <Alert status="yellow" text={alert} /> : null}
+          </form>
+        </div>
+      </Page>
+    </body>
   );
 };
+
+export default SendPage;

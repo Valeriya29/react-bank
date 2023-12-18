@@ -1,93 +1,50 @@
+//import Notification from './notification'
+const Transaction = require('./transaction')
+
 class User {
-  // Задаємо масив в якому будемо зберегати списком інформацію про користувачів
-  static #list = []
-  static #count = 1
+  static users = []
 
-  constructor({ email, password }) {
-    this.id = User.#count++
-    this.email = String(email).toLowerCase()
-    this.password = String(password)
-    this.isConfirm = false
+  constructor(email, password) {
+    this.id = User.users.length + 1
+    this.email = email
+    this.password = password
+    this.token = this.generateRandomToken(12)
+    this.code = Math.floor(1000 + Math.random() * 9000)
+    this.isConfirmed = false
+    this.isLogged = false
+
+    this.balance = 0
+    this.transactions = []
+    this.notifications = []
+
+    User.users.push(this) // Add the new user to the users array
   }
 
-  //Стат метод приймає данні data
-  static create(data) {
-    //Створює юзера
-    const user = new User(data)
-    //і додає його в масив list
-    this.#list.push(user)
-
-    // console.log(this.#list)
-
-    return user
+  generateRandomToken(length) {
+    const characters =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*'
+    let token = ''
+    for (let i = 0; i < length; i++) {
+      const randomIndex = Math.floor(
+        Math.random() * characters.length,
+      )
+      token += characters.charAt(randomIndex)
+    }
+    return token
   }
 
-  //Шукаємо користувача по email
-  static getByEmail = (email) => {
-    const user = this.#list.find(
-      (user) => user.email === String(email).toLowerCase(),
+  static getUserByEmail(email) {
+    return User.users.find((user) => user.email === email)
+  }
+
+  getUserTransactionById(id) {
+    return this.transactions.find(
+      (transaction) => transaction.id === id,
     )
-
-    if (user) {
-      return user
-    }
-    return false
   }
 
-  // getById - знаходить user по id
-  static getById = (id) => {
-    const user = this.#list.find(
-      (user) => user.id === Number(id),
-    )
-    if (user) {
-      return user
-    }
-    return false
-  }
-
-  //отримати список користуваців
-  static getList = () => this.#list
-
-  //Перевірка чи є такий такий email і надаємо значення isConfirm
-  static confirmByEmail = (email) => {
-    const user = this.getByEmail(email)
-
-    if (user) user.isConfirm = true
-  }
-
-  //оновити email ======
-  static updateEmail = (newEmail, oldEmail, password) => {
-    const user = User.getByEmail(oldEmail)
-
-    if (
-      user &&
-      user.password === password &&
-      user.email === oldEmail
-    ) {
-      if (User.getByEmail(newEmail)) {
-        return false
-      }
-      user.email = newEmail
-
-      return user
-    }
-    return false
-  }
-  static updatePassword = (
-    email,
-    password,
-    newPassword,
-  ) => {
-    const user = User.getByEmail(email)
-
-    if (user && user.password === password) {
-      user.password = newPassword
-      user.isConfirm = false
-
-      return user
-    }
-    return false
-  }
+  static existingUser = (email) =>
+    User.getUserByEmail(email)
 }
-console.log('====>', User.getList())
-module.exports = { User }
+
+module.exports = User

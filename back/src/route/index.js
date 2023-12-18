@@ -2,82 +2,42 @@
 const express = require('express')
 const router = express.Router()
 
-// ↙️ тут вводимо шлях (PATH) до сторінки
-router.get('/', function (req, res) {
-  // res.render генерує нам HTML сторінку
-
-  // ↙️ cюди вводимо назву файлу з сontainer
-  res.render('Welcome', {
-    // вказуємо назву контейнера
-    name: 'Welcome',
-    // вказуємо назву компонентів
-    component: [],
-
-    // вказуємо назву сторінки
-    title: 'Welcome',
-    // ... сюди можна далі продовжувати додавати потрібні технічні дані, які будуть використовуватися в layout
-
-    // вказуємо дані,
-    data: {},
-  })
-  // ↑↑ сюди вводимо JSON дані
-})
-
-//======================================
-
-// // ↙️ тут вводимо шлях (PATH) до сторінки
-// router.get('/home', function (req, res) {
-//   // res.render генерує нам HTML сторінку
-
-//   // ↙️ cюди вводимо назву файлу з сontainer
-//   res.render('home', {
-//     // вказуємо назву контейнера
-//     name: 'home',
-//     // вказуємо назву компонентів
-//     component: [],
-
-//     // вказуємо назву сторінки
-//     title: 'Home page',
-//     // ... сюди можна далі продовжувати додавати потрібні технічні дані, які будуть використовуватися в layout
-
-//     // вказуємо дані,
-//     data: {},
-//   })
-//   // ↑↑ сюди вводимо JSON дані
-// })
-// //======================================
-
-// router.get('/logout', function (req, res) {
-//   // res.render генерує нам HTML сторінку
-
-//   // ↙️ cюди вводимо назву файлу з сontainer
-//   res.render('logout', {
-//     // вказуємо назву контейнера
-//     name: 'logout',
-//     // вказуємо назву компонентів
-//     component: [],
-
-//     // вказуємо назву сторінки
-//     title: 'Logout page',
-//     // ... сюди можна далі продовжувати додавати потрібні технічні дані, які будуть використовуватися в layout
-
-//     // вказуємо дані,
-//     data: {},
-//   })
-//   // ↑↑ сюди вводимо JSON дані
-// })
+const signupRoute = require('./signup')
+const signupConfirmRoute = require('./signup-confirm')
+const signinRoute = require('./signin')
+const recoveryRoute = require('./recovery')
+const recoveryConfirmRoute = require('./recovery-confirm')
+const balanceRoute = require('./balance')
+const changeEmailRoute = require('./change-email')
+const changePasswordRoute = require('./change-password')
+const notificationsRoute = require('./notifications')
+const transactionRoute = require('./transaction')
+const sendRoute = require('./send')
+const receiveRoute = require('./recive')
 
 // Підключіть файли роутів
-const auth = require('./auth')
-const inacc = require('./inacc')
-
+// const test = require('./test')
 // Підключіть інші файли роутів, якщо є
 
 // Об'єднайте файли роутів за потреби
-router.use('/', auth)
-router.use('/', inacc)
-
+// router.use('/', test)
 // Використовуйте інші файли роутів, якщо є
+router.use('/signup', signupRoute)
+router.use('/signup-confirm', signupConfirmRoute)
+router.use('/signin', signinRoute)
+router.use('/recovery', recoveryRoute)
+router.use('/recovery-confirm', recoveryConfirmRoute)
+router.use('/balance', balanceRoute)
+router.use('/change-email', changeEmailRoute)
+router.use('/change-password', changePasswordRoute)
+router.use('/notifications', notificationsRoute)
+router.use('/transaction', transactionRoute)
+router.use('/send', sendRoute)
+router.use('/recive', receiveRoute)
+
+router.get('/', (req, res) => {
+  res.status(200).json('Hello World')
+})
 
 // Експортуємо глобальний роутер
 module.exports = router

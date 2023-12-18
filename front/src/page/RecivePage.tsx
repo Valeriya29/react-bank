@@ -1,153 +1,147 @@
-import "../style/authpage.scss";
-import { useContext, useReducer, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, ChangeEvent } from "react";
+import { Link, Navigate, useNavigate } from "react-router-dom";
+import StatusBar from "../component/status-bar/index";
+import Alert from "../component/alert/index";
+import Page from "../component/page/index";
+import { useAuth } from "../container/AuthContext";
+import ArrowBackTitle from "../component/arrow-back-title";
+import { validateMoneyAmount } from "../component/Utils";
+import InputAmount from "../component/input-amount";
+import PaymentSystem from "../component/payment-system";
 
-import { AuthContext } from "../App";
-import React from "react";
-import PaymentSystemList from "../container/payment-system-list";
-import StatusBar from "../component/statusbar";
-import Title from "../component/title";
-import BackButtonTitle from "../component/back-button-title";
-import Page from "../component/page";
-import Input from "../component/input";
-import Button from "../component/button";
-import Alert from "../component/alert";
-import Grid from "../component/grid";
-import Divider from "../component/divider";
+//Сторінка поповнення балансу. Користувач вводить суму, натискає
+//на платіжний метод і відправляється запит. Після чого
+//створюється нова транзакція та нова нотифікація
+type PaymentSystem = {
+  system: string;
+  methods: string[];
+};
 
-import { NAME_FIELD, ERR_FIELD, REG_EXP_MONEY } from "../data/const";
-import { ACTION_TYPE, initialState, reducer } from "../util/reducer";
+const RecivePage: React.FC = () => {
+  const [amount, setAmount] = useState<string>("");
+  const [paySystem, setPaySystem] = useState("");
+  const [isAmountValid, setAmountIsValid] = useState(true);
+  const [alert, setAlert] = useState<string>("");
+  const { state, dispatch } = useAuth();
 
-const { SUM, PAY_SYS, EMAIL } = NAME_FIELD;
-
-export const RecivePage: React.FC = () => {
-  const auth = useContext(AuthContext);
-
-  //====== Достаємо значення і поля вводу=====
-  // ===== через useReducer =====
-  const [state, dispatch] = useReducer(reducer, initialState);
-
-  const handleInputChange = (name: string, value: string) => {
-    dispatch({
-      type: ACTION_TYPE.SET_FORM_VAL,
-      payload: {
-        ...state.formValues,
-        [name]: value,
-      },
-    });
+  const stripe: PaymentSystem = {
+    system: "Stripe",
+    methods: [
+      "./../svg/pay-visa.svg",
+      "./../svg/pay-thron.svg",
+      "./../svg/pay-bitcoin.svg",
+      "./../svg/pay-redthron.svg",
+      "./../svg/pay-etherium.svg",
+      "./../svg/pay-bnb.svg",
+    ],
+  };
+  const coinbase: PaymentSystem = {
+    system: "Coinbase",
+    methods: [
+      "./../svg/pay-thron.svg",
+      "./../svg/pay-visa.svg",
+      "./../svg/pay-redthron.svg",
+      "./../svg/pay-bitcoin.svg",
+      "./../svg/pay-bnb.svg",
+      "./../svg/pay-etherium.svg",
+    ],
   };
 
-  //=====Перевірки того що вводять в поле====
-  const validateSum = () => {
-    const amount = state.formValues.sum;
+  const receiverEmail = state.email;
 
-    const err = { [SUM]: "" };
-
-    if (amount.length < 1) {
-      err[SUM] = ERR_FIELD.IS_EMPTY;
-    } else if (amount.length > 8) {
-      err[SUM] = ERR_FIELD.IS_BIG;
-    } else if (!REG_EXP_MONEY.test(amount)) {
-      err[SUM] = ERR_FIELD.MONEY;
-    }
-    dispatch({ type: ACTION_TYPE.SEN_FORM_ERR, payload: err });
-    return Object.values(err).every((err) => !err);
+  const handleMoneyAmountChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    const newAmount: string = e.target.value;
+    setAmount(newAmount);
+    setAmountIsValid(validateMoneyAmount(newAmount) || newAmount === "");
   };
 
-  //відправка на сервер
+  const navigate = useNavigate();
 
-  const [isDataSent, setIsDataSent] = useState(false);
-
-  const handleSubmit = (name: string, value: string) => {
-    const checkValidate = validateSum();
-
-    if (checkValidate) {
-      dispatch({
-        type: ACTION_TYPE.SET_FORM_VAL,
-        payload: {
-          ...state.formValues,
-          [name]: value,
-        },
-      });
-
-      setIsDataSent(true);
-    }
+  const handleStripeClick = () => {
+    setPaySystem("Stripe");
   };
 
-  useEffect(() => {
-    const submitMoney = async () => {
+  const handleCoinbaseClick = () => {
+    setPaySystem("Coinbase");
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!amount) {
+      setAlert("Enter amount!");
+    } else if (!paySystem) {
+      setAlert("Choise payment method!");
+    } else if (!isAmountValid) {
+      setAlert("Enter a valid amount");
+    } else {
       try {
-        const res = await fetch(`http://localhost:4000/recive`, {
+        const response = await fetch("http://localhost:4000/recive", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: convertData(),
+          body: JSON.stringify({ paySystem, receiverEmail, amount }),
         });
 
-        const data = await res.json();
-        // console.log("data----->", data);
-        // console.log(res.ok);
-
-        if (res.ok) {
-          dispatch({
-            type: ACTION_TYPE.SUCCESS,
-            payload: true,
-          });
-
-          return dispatch({
-            type: ACTION_TYPE.SET_ALERT,
-            payload: data.message,
-          });
+        if (response.status === 409) {
+          const responseData = await response.json();
+          setAlert(responseData.error);
         }
 
-        dispatch({
-          type: ACTION_TYPE.SUCCESS,
-          payload: false,
-        });
-
-        dispatch({
-          type: ACTION_TYPE.SET_ALERT,
-          payload: data.message,
-        });
-      } catch (error: any) {
-        dispatch({
-          type: ACTION_TYPE.SET_ALERT,
-          payload: error.toString(),
-        });
+        if (response.ok) {
+          // Registration successful, you can navigate to the next page
+          const responseData = await response.json(); // Parse the JSON response
+          console.log("Response Data:", responseData);
+          setAlert(responseData.message);
+          navigate("/balance");
+        } else {
+          // Handle registration errors
+          console.error("Receiving failed");
+        }
+      } catch (error) {
+        console.error("An error occurred:", error);
       }
-    };
-    if (isDataSent) submitMoney();
-    setIsDataSent(false);
-  }, [isDataSent]);
-
-  const convertData = () => {
-    return JSON.stringify({
-      [SUM]: Number(state.formValues[SUM]),
-      [EMAIL]: auth?.state.user?.email,
-      [PAY_SYS]: state.formValues[PAY_SYS],
-    });
+    }
   };
 
   return (
-    <Page className="light-gray">
-      <div className="box">
-        <StatusBar />
-        <BackButtonTitle title="Recive" />
-      </div>
-      <Grid small>
-        <Title title="Recive amount" desctiption="" small />
-        <Input
-          placeholder="$"
-          name={SUM}
-          onInputChange={(value) => handleInputChange(SUM, value)}
-          error={state.formErrors[SUM]}
-        />
-        <Divider />
-        <Title title="Payment system" desctiption="" small />
-        <PaymentSystemList onChange={handleSubmit} />
-        <Alert success={state.data} text={state.alert} />
-      </Grid>
-    </Page>
+    <body style={{ backgroundColor: "var(--Grey-BG, #F5F5F7)" }}>
+      <Page>
+        <StatusBar color="black" />
+        <ArrowBackTitle title="Receive" />
+
+        <div className="inputs">
+          <form className="form" onSubmit={handleSubmit}>
+            <InputAmount
+              label="Receive amount"
+              labelClassName={isAmountValid ? "input" : "input--error"}
+              borderClassName={
+                isAmountValid ? "input__field" : "input__field--error"
+              }
+              name={"amount"}
+              type="number"
+              value={amount}
+              onChange={handleMoneyAmountChange}
+              notice={isAmountValid ? "" : "Amount is not valid"}
+            />
+            <div></div>
+
+            <div>Payment system</div>
+            <button id="stripe" type="submit" onClick={handleStripeClick}>
+              {" "}
+              <PaymentSystem paymentSystem={stripe} />
+            </button>
+            <button id="coinbase" type="submit" onClick={handleCoinbaseClick}>
+              <PaymentSystem paymentSystem={coinbase} />{" "}
+            </button>
+
+            {alert ? <Alert status="yellow" text={alert} /> : null}
+          </form>
+        </div>
+      </Page>
+    </body>
   );
 };
+
+export default RecivePage;
