@@ -1,28 +1,25 @@
-import "./index.css";
-import React from "react";
+import "./index.scss";
+import Danger from "./svg/danger.svg";
+import SuccessIcon from "./svg/success.svg";
+import { AlertProps } from "../../data/type";
 
-type AlertProps = {
-  status: "yellow" | "red";
-  text: string;
-};
-
-const Alert: React.FC<AlertProps> = ({ status, text }) => {
-  let src = "";
-  let color = "";
-
-  if (status === "yellow") {
-    src = "./svg/alert-yellow.svg";
-    color = "orange";
-  } else if (status === "red") {
-    src = "./svg/alert-red.svg";
-    color = "red";
-  }
-
+const Alert: React.FC<AlertProps> = ({ text, success }) => {
   return (
-    <div className="alert" style={{ color }}>
-      <img src={src} alt="Alert bare" />
-      {text}
-    </div>
+    <>
+      {text && (
+        <div
+          className={`${
+            success ? "alert alert--success" : "alert alert--error"
+          }`}
+        >
+          <img src={`${success ? SuccessIcon : Danger}`} alt="alert" />
+
+          <span className={`${success ? "text__success" : "text--error"}`}>
+            {text}
+          </span>
+        </div>
+      )}
+    </>
   );
 };
 
